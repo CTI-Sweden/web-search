@@ -6,6 +6,8 @@
   import axios from 'axios';
   import { searchResultsStore } from "/src/stores/searchResultsStore.ts";
 
+  import { env } from '$env/dynamic/public';
+
   let searchText = "";
   let timeout;
 
@@ -18,7 +20,7 @@
 
   async function fetchSearchResults() {
     try {
-      let {data, status} = await axios.post('http://127.0.0.1:8000/search', {
+      let {data, status} = await axios.post(env.PUBLIC_CTI_API_HOST + '/search', {
         text: searchText
       });
       if (status != 200) {
@@ -28,7 +30,7 @@
       console.log(data.results)
       searchResultsStore.set(data.results);
     } catch(error) {
-      alert("Error fetching search results! Probably the API is not ready yet.");
+      console.log("Error fetching search results! Probably the API is not ready yet.");
       return;
     }
   }
