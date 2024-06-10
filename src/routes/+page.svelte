@@ -1,12 +1,16 @@
 <script lang="ts">
-  import * as Pagination from "$lib/components/ui/pagination";
+  import Navbar from "$lib/components/Navbar.svelte";
 
+  import * as Pagination from "$lib/components/ui/pagination";
 
   import SearchBar from "$lib/components/SearchBar.svelte";
   import SearchResults from "$lib/components/SearchResults.svelte"
 </script>
 
 <div>
+
+  <Navbar />
+
   <div class="ml-auto mr-auto w-fit">
     <h1 class="text-3xl m-4">Search</h1>
   </div>
