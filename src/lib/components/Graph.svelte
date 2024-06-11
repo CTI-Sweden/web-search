@@ -7,7 +7,8 @@
 
 
   import axios from 'axios';
-  import { graphResultsStore } from "/src/stores/graphResultsStore.ts";
+  //import { graphResultsStore } from "/src/stores/graphResultsStore.ts";
+  import { searchResultsStore } from "/src/stores/searchResultsStore.ts";
 
   import { env } from '$env/dynamic/public';
 
@@ -31,9 +32,10 @@
         return;
       }
       console.log(data.results)
-      graphResultsStore.set(data.results);
+      searchResultsStore.set(data.results);
     } catch(error) {
       console.log("Error fetching search results! Probably the API is not ready yet.");
+      console.log(error);
       return;
     }
   }
@@ -49,11 +51,13 @@
 
   let canvas: HTMLCanvasElement;
   let context;
+  let tooltip;
   let links: Link[];
   let nodes: Node[];
   let simulation;
-  const width = 928;
-  const height = 600;
+  let dragStartTime;
+  const width = 1200;
+  const height = 1000;
   const nodeRadius = 8;
   const colour = d3.scaleOrdinal<number, string>(d3.schemeCategory10);
 
@@ -118,17 +122,58 @@
     if (!event.active) simulation.alphaTarget(0.3).restart();
     event.subject.fx = event.subject.x;
     event.subject.fy = event.subject.y;
+    dragStartTime = d3.now();
   }
 
   function dragged(event: d3.D3DragEvent<HTMLCanvasElement, Node, Node>): void {
     event.subject.fx = event.x;
     event.subject.fy = event.y;
+    tooltip.transition().duration(50)
+      .style("opacity", 0).on("end", () => {
+        tooltip.style("left", "0px");
+        tooltip.style("top", "-20px");
+      });
   }
 
   function dragended(event: d3.D3DragEvent<HTMLCanvasElement, Node, Node>): void {
     if (!event.active) simulation.alphaTarget(0);
     event.subject.fx = null;
     event.subject.fy = null;
+    if (event.subject.group == 1 && event.sourceEvent.timeStamp - dragStartTime < 300) {
+      window.open(event.subject.id, "_blank");
+    }
+  }
+
+  function mouseMove(event): void {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    let found = false;
+    for (const node of nodes) {
+      const dx = node.x! - mouseX;
+      const dy = node.y! - mouseY;
+      if (Math.sqrt(dx * dx + dy * dy) < nodeRadius) {
+        let myContainer = <HTMLElement> document.querySelector("#graphTooltip");
+        myContainer.innerHTML = `<p>${node.id}</p>`;
+        tooltip.style("left", event.clientX + 10 + "px");
+        tooltip.style("top", event.clientY + 10 + "px");
+        tooltip.innerHTML = '<p>Some other shite text</p>';
+        tooltip.style.display = "block";
+        tooltip.transition().duration(50)
+          .style("opacity", 1);
+          //.innerHTML(`<p>node: ${node.id}</p>`);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      tooltip.transition().duration(50)
+        .style("opacity", 0).on("end", () => {
+          tooltip.style("left", "0px");
+          tooltip.style("top", "-20px");
+        });
+    }
   }
 
   let data = {
@@ -170,7 +215,6 @@
     let type = new Set<string>();
     value.forEach((result) => {
       try {
-        console.log("generateGraph", result)
         data.nodes.push({id: result.link, group: 1, x: width/2, y: height/2});
         result.affected_industries?.forEach((e) => {industires.add(e); data.links.push({source: result.link, target: e})});
         // result.authors?.forEach((e) => {authors.add(e); data.links.push({source: result.link, target: e})});
@@ -225,6 +269,9 @@
     context = canvas.getContext("2d")!;
     context.scale(dpi, dpi);
 
+    // tooltip = d3.select(canvas).append("div").attr("class", "tooltip").style("opacity", 0);
+    tooltip = d3.select("#graphTooltip").style("opacity", 0);
+
     d3.select(canvas)
       .call(d3.drag<HTMLCanvasElement, Node>()
         .subject((event: any) => {
@@ -237,6 +284,7 @@
         .on("start", dragstarted)
         .on("drag", dragged)
         .on("end", dragended));
+    canvas.addEventListener("mousemove", mouseMove);
 
     // Create a promise to handle invalidation.
     const invalidation = new Promise<void>((resolve) => {
@@ -245,7 +293,7 @@
     });
     invalidation.then(() => simulation.stop());
 
-    graphResultsStore.subscribe((value) => {
+    searchResultsStore.subscribe((value) => {
       generateGraph(value);
     })
   });
@@ -257,6 +305,7 @@
   <Input bind:value={searchText}  on:keydown={()=> keyPressed()}  />
   <Button variant="outline">Button</Button>
 </div>
+<div id="graphTooltip" class="tooltip" style="opacity: 0;position: absolute"><p>Some shite text</p></div>
 <canvas 
   bind:this={canvas}
   width={width}
@@ -268,6 +317,13 @@
     width: 100%;
     height: 100%;
     border:1px solid #000000;
+  }
+
+  .tooltip {
+    background-color: black;
+    color: white;
+    padding: 4px;
+    border-radius: 4px;
   }
 </style>
 
